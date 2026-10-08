@@ -4,6 +4,7 @@
   flex-direction: column;
   background: var(--bg-primary);
   overflow: hidden;
+  position: relative;
 }
 
 .review-toolbar {
@@ -473,4 +474,130 @@
 .review-pager .review-btn-secondary:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+/* 一键同意的站内确认框：盖住 review 视图的浮层，与控制台深色玻璃风一致。 */
+.review-modal-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 6, 12, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+}
+
+.review-modal {
+  width: 340px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-glass);
+  border-radius: 12px;
+  padding: 20px 22px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.5);
+}
+
+.review-modal h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  color: var(--text-primary);
+}
+
+.review-modal p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+.review-modal p b {
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.review-modal-counts {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-modal-counts li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--border-glass);
+  border-radius: 6px;
+}
+
+.review-modal-counts li label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  cursor: pointer;
+}
+
+.review-modal-counts li label span {
+  flex: 0 0 auto;
+}
+
+.review-modal-counts li label b {
+  margin-left: auto;
+}
+
+/* 原生复选框太白，和深色玻璃风不搭：自己画，青色描边＋勾选填青。 */
+.review-modal-counts li input[type="checkbox"] {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  cursor: pointer;
+  flex: 0 0 auto;
+  border: 1px solid rgba(0, 212, 170, 0.45);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+  display: inline-grid;
+  place-content: center;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.review-modal-counts li input[type="checkbox"]:hover {
+  border-color: var(--accent-cyan);
+}
+
+.review-modal-counts li input[type="checkbox"]::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  transform: scale(0);
+  transition: transform 0.12s;
+  background: var(--accent-cyan);
+  clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+}
+
+.review-modal-counts li input[type="checkbox"]:checked {
+  background: rgba(0, 212, 170, 0.18);
+  border-color: var(--accent-cyan);
+}
+
+.review-modal-counts li input[type="checkbox"]:checked::before {
+  transform: scale(1);
+}
+
+.review-modal-counts li b {
+  color: var(--accent-blue);
+  font-family: var(--font-mono);
+}
+
+.review-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }

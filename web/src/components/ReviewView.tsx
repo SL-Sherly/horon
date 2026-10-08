@@ -314,6 +314,15 @@ export default function ReviewView({
   const [reviews, setReviews] = useState<ConceptReviewItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<Record<number, boolean>>({});
+  const [approveAllLoading, setApproveAllLoading] = useState(false);
+  // 一键同意的站内确认框：浏览器 confirm 与控制台风格脱节，这里自己画。
+  // 按快照原生三态筛（新建默认勾，修改/删除默认不勾），点同意只关所选三态的快照。
+  const [approveAllOpen, setApproveAllOpen] = useState(false);
+  const [approveAllCats, setApproveAllCats] = useState({
+    creation: true,
+    update: false,
+    deletion: false,
+  });
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [diffMode, setDiffMode] = useState<DiffMode>(() =>
@@ -368,6 +377,50 @@ export default function ReviewView({
     },
     [onRefreshGraph]
   );
+
+  const approveAllCounts = useMemo(() => {
+    const creations = reviews.filter((r) => r.is_creation).length;
+    const deletions = reviews.filter((r) => r.is_deleted).length;
+    return {
+      creation: creations,
+      deletion: deletions,
+      update: reviews.length - creations - deletions,
+    };
+  }, [reviews]);
+
+  const handleApproveAll = useCallback(() => {
+    if (reviews.length === 0 || approveAllLoading) {
+      return;
+    }
+    setApproveAllOpen(true);
+  }, [reviews, approveAllLoading]);
+
+  const confirmApproveAll = useCallback(async () => {
+    const only = (Object.keys(approveAllCats) as ("creation" | "update" | "deletion")[]).filter(
+      (k) => approveAllCats[k]
+    );
+    if (only.length === 0) {
+      return;
+    }
+    setApproveAllOpen(false);
+    if (approveAllLoading) {
+      return;
+    }
+    setApproveAllLoading(true);
+    try {
+      const res = await api.approveAllReviews(only);
+      const ok = new Set(res.approved);
+      setReviews((prev) => prev.filter((r) => !ok.has(r.concept_id)));
+      if (res.failed.length > 0) {
+        alert(`部分失败：${res.failed.map((f) => `${f.concept_id}: ${f.error}`).join("；")}`);
+      }
+      onRefreshGraph?.();
+    } catch (e: any) {
+      alert(`全部同意失败: ${e.message}`);
+    } finally {
+      setApproveAllLoading(false);
+    }
+  }, [approveAllCats, approveAllLoading, onRefreshGraph]);
 
   const handleRollback = useCallback(
     async (conceptId: number, isCreation: boolean, isDeleted: boolean) => {
@@ -431,6 +484,14 @@ export default function ReviewView({
               仅改动
             </button>
           </div>
+          <button
+            className="review-btn-secondary"
+            onClick={handleApproveAll}
+            disabled={reviews.length === 0 || approveAllLoading}
+            title="同意当前库全部待审核（RP 开档一次十几个新建，逐条点是体力活）"
+          >
+            {approveAllLoading ? "处理中..." : "全部同意"}
+          </button>
           <button className="review-btn-secondary" onClick={fetchReviews}>
             刷新 (Refresh)
           </button>
@@ -484,6 +545,59 @@ export default function ReviewView({
           </div>
         )}
       </div>
+
+      {approveAllOpen && (
+        <div className="review-modal-overlay" onClick={() => setApproveAllOpen(false)}>
+          <div className="review-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>全部同意</h3>
+            <p>
+              勾了哪类就放行哪类。放行即清快照，没有后悔药。
+            </p>
+            <ul className="review-modal-counts">
+              {(
+                [
+                  ["creation", "新建"],
+                  ["update", "修改"],
+                  ["deletion", "删除"],
+                ] as [keyof typeof approveAllCats, string][]
+              ).map(([key, label]) => (
+                <li key={key}>
+                  <label>
+                    <span>{label}</span>
+                    <b>{approveAllCounts[key]}</b>
+                    <input
+                      type="checkbox"
+                      checked={approveAllCats[key]}
+                      onChange={() =>
+                        setApproveAllCats((prev) => ({ ...prev, [key]: !prev[key] }))
+                      }
+                    />
+                  </label>
+                </li>
+              ))}
+            </ul>
+            <div className="review-modal-actions">
+              <button
+                className="review-btn-secondary"
+                onClick={() => setApproveAllOpen(false)}
+              >
+                取消
+              </button>
+              <button
+                className="review-btn review-btn-approve"
+                onClick={confirmApproveAll}
+                disabled={
+                  !approveAllCats.creation &&
+                  !approveAllCats.update &&
+                  !approveAllCats.deletion
+                }
+              >
+                同意所选
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

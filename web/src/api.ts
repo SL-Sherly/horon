@@ -59,6 +59,17 @@ export const api = {
       method: "POST",
     }),
 
+  approveAllReviews: (only?: ("creation" | "update" | "deletion")[]) =>
+    fetchJSON<{
+      approved: number[];
+      failed: { concept_id: number; error: string }[];
+      skipped: number[];
+    }>(withDb(`${BASE}/reviews/approve-all`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ only: only ?? ["creation", "update", "deletion"] }),
+    }),
+
   rollbackReview: (conceptId: number) =>
     fetchJSON<{ message: string; concept_id: number }>(withDb(`${BASE}/reviews/${conceptId}/rollback`), {
       method: "POST",

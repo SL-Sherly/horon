@@ -8,7 +8,7 @@ import threading
 from collections import Counter
 from contextlib import asynccontextmanager, contextmanager
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Body, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from ._db_common import (
@@ -393,6 +393,46 @@ def get_reviews(db_alias: str | None = Query(default=None, alias="db")):
         with _lock_for(alias):
             items = handle.list_snapshots()
         return [item.model_dump() for item in items]
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.post("/api/reviews/approve-all")
+def approve_all_reviews(
+    db_alias: str | None = Query(default=None, alias="db"),
+    payload: dict | None = Body(default=None),
+):
+    """按快照原生三态批量同意当前库的待审核（只认 ?db= 当前库，不碰别的库）。
+
+    payload: {"only": ["creation" | "update" | "deletion"]}——只关所选三态的快照；
+    不传则全量（兼容旧前端）。三态定义与列表页一致：新建＝is_creation，
+    删除＝节点已不在库里，其余全算修改。逐个复用 approve_snapshots。
+    """
+    alias = _alias_param(db_alias)
+    handle = get_db(alias)
+    only = (payload or {}).get("only") if isinstance(payload, dict) else None
+    if only is not None:
+        allowed = {"creation", "update", "deletion"}
+        if not isinstance(only, list) or not only or any(c not in allowed for c in only):
+            raise HTTPException(status_code=400, detail="only must be a non-empty list of creation/update/deletion")
+        only = set(only)
+    try:
+        with _lock_for(alias):
+            items = handle.list_snapshots()
+            approved: list[int] = []
+            failed: list[dict] = []
+            skipped: list[int] = []
+            for it in items:
+                cat = "creation" if it.is_creation else ("deletion" if it.is_deleted else "update")
+                if only is not None and cat not in only:
+                    skipped.append(it.concept_id)
+                    continue
+                try:
+                    handle.approve_snapshots(it.concept_id)
+                    approved.append(it.concept_id)
+                except Exception as e:
+                    failed.append({"concept_id": it.concept_id, "error": str(e)})
+        return {"approved": approved, "failed": failed, "skipped": skipped}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
